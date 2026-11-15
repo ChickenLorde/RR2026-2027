@@ -31,6 +31,8 @@ public class Driver {
     public Servo outtakeIncline;
     public Servo outtakeBackplate;
 
+    public Servo flowerLeft, flowerRight;
+
     public double Kp, Ki, Kd;
 
 

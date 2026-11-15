@@ -2,6 +2,8 @@ package org.firstinspires.ftc.teamcode.teleop;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.teamcode.Utility.Time;
 
@@ -12,15 +14,16 @@ import java.util.Locale;
 
 @TeleOp(name = "Main TeleOp",group = "Competition Modes")
 public class Main extends LinearOpMode {
+    //Busy-wait for the requested duration; currently unused.
     public void waitSeconds(double seconds) {
         long startTime = System.currentTimeMillis();
         while(true)
             if (System.currentTimeMillis() - startTime >= seconds * 1000)
                 return;
     }
-    double power = 1; //Drive power multiplier, changed with D-pad left/right
+    double power = 1; //Drive power multiplier; D-pad adjustment below is disabled
 
-    int prevOuttakeTicks = 0;
+    int prevOuttakeTicks = 0; //Previous outtake encoder reading for the velocity calculation
     Time time = new Time(); //Timer helper: provides getTimer(), resetTime() and getDeltaTime()
     public Vector2 pos = new Vector2(); //In ticks (unused)
 
@@ -32,17 +35,21 @@ public class Main extends LinearOpMode {
     public double previousRightDistance; //Unused
 
 
-    //goBILDA Dual Mode servo in servo mode: 300 degrees over 500-2500us
-    //Angle that corresponds to setPosition(1.0)
+    //Assumed servo travel in degrees corresponding to a position change from 0.0 to 1.0
     static final double SERVO_RANGE_DEGREES = 360;
     //Target angles in degrees - tune these
-    static final double nectarAngle = -300; //Backplate angle when A is pressed
-    static final double pollenAngle = 300; //Backplate angle when B is pressed
+    static final double nectarAngle = 300; //Backplate target when B is pressed (clamped to the servo range)
+    static final double pollenAngle = -300; //Backplate target when Y is pressed (clamped to the servo range)
     static final double INCLINE_STEP_DEGREES = 90; //Incline change per D-pad up/down press
-    static final double pollen_RMP = 0.5843;
-    static final double nectar_RMP = 0.7778;
+    static final double pollen_RMP = 0.5843; //Unused
+    static final double nectar_RMP = 0.7778; //Unused
+    static final double FLOWER_DOWN_DEGREES = 90; //Flower target when lowered
+    static final double FLOWER_UP_DEGREES = 360; //Flower target when raised
+    static final double OUTTAKE_RUN_SECONDS = 5.0; //Duration of each timed outtake run
     boolean prevDpadUp = false; //D-pad up state last loop, used to detect a new press
     boolean prevDpadDown = false; //D-pad down state last loop, used to detect a new press
+    boolean prevX = false; //Previous X state, used to detect a new press
+    boolean flowersDown = false; //Current flower target; starts raised
 
     //Backplate angles are relative to the servo's center: 0 = middle, +/- = either side (clamped to +/- half the range)
     static double centeredAngleToPosition(double degrees) {
@@ -61,8 +68,11 @@ public class Main extends LinearOpMode {
 
     public void runOpMode() throws InterruptedException {
 
-        //Driver holds the motors, servos and position tracker
+        //Driver holds the motors, servos and position tracker; map the flower servos separately
         drive = new Driver(hardwareMap, telemetry);
+        drive.flowerLeft = hardwareMap.get(Servo.class, "flowerLeft");
+        drive.flowerRight = hardwareMap.get(Servo.class, "flowerRight");
+        drive.flowerRight.setDirection(Servo.Direction.REVERSE); //Compensate for mirrored mounting
 
         //Start both servos at 0 degrees
         backplateServoPosition = 0;
@@ -70,6 +80,11 @@ public class Main extends LinearOpMode {
         waitForStart(); //Wait for Play to be pressed
         double timeTest = 0; //Unused
         double rate = 0.0065; //Unused
+        //Track the timed outtake run and detect new A presses without blocking the drive loop.
+        ElapsedTime outtakeTimer = new ElapsedTime();
+        boolean outtakeRunning = false;
+        boolean prevA = false;
+        try {
         while(opModeIsActive())
         {
 
@@ -84,13 +99,23 @@ public class Main extends LinearOpMode {
             }*/
 
             //region scoring
-            //Intake (right trigger, max 60%) and outtake (left trigger, max 100%); ignores presses under 0.1
+            //Each bumper contributes positive power to the intake.
             drive.intake.setPower((gamepad1.left_bumper ? 1 : 0) - (gamepad1.right_bumper ? -1 : 0));
-
+            //A starts or restarts the timed outtake run; holding A does not restart the timer.
+            boolean aPressed = gamepad1.a;
+            if (aPressed && !prevA) {
+                outtakeTimer.reset();
+                outtakeRunning = true;
+            }
+            prevA = aPressed;
+            if (outtakeRunning && outtakeTimer.seconds() >= OUTTAKE_RUN_SECONDS) {
+                outtakeRunning = false;
+            }
+            drive.outtake.setPower(outtakeRunning ? 1.0 : 0.0);
             //Backplate servo
-            //A / B set the target angle (degrees); it is converted to 0-1 and sent to the servo
+            //Y / B set the target angle (degrees); it is converted to 0-1 and sent to the servo
             if(gamepad1.y) backplateServoPosition = pollenAngle;
-            if(gamepad1.a) backplateServoPosition = nectarAngle;
+            if(gamepad1.b) backplateServoPosition = nectarAngle;
 
             //Incline servo
             //D-pad up/down: each new press (not hold, via prev flags) adds/subtracts INCLINE_STEP_DEGREES,
@@ -103,6 +128,13 @@ public class Main extends LinearOpMode {
 
             drive.outtakeBackplate.setPosition(centeredAngleToPosition(backplateServoPosition));
             drive.outtakeIncline.setPosition(angleToPosition(inclineServoPosition));
+            //Each new X press toggles both flowers between their up and down targets.
+            if (gamepad1.x && !prevX) flowersDown = !flowersDown;
+            prevX = gamepad1.x;
+            double flowerPosition = angleToPosition(
+                    flowersDown ? FLOWER_DOWN_DEGREES : FLOWER_UP_DEGREES);
+            drive.flowerLeft.setPosition(flowerPosition);
+            drive.flowerRight.setPosition(flowerPosition);
 
 
                 //scoring.intake.setPower(gamepad1.left_bumper || gamepad2.dpad_up ? 1.0: 0);
@@ -147,6 +179,7 @@ public class Main extends LinearOpMode {
                 "Pos: "+"("+drive.positionTracker.getX()+" , "+drive.positionTracker.getY()+")";
                 telemetry.addLine(position);
 
+                //Estimate outtake encoder speed from the change in ticks since the last loop.
                 int outtakeTicks = drive.outtake.getCurrentPosition();
                 double outtakeVelocity = (outtakeTicks - prevOuttakeTicks) / time.getDeltaTime();
                 prevOuttakeTicks = outtakeTicks;
@@ -154,14 +187,22 @@ public class Main extends LinearOpMode {
             //endregion
             //Driver Station telemetry
             telemetry.addData("Wheel Motor Power",power);
-            telemetry.addData("Outtake", "Left Bumper");
-            telemetry.addData("Outtake Power: ", gamepad1.left_trigger);
+            telemetry.addData("Outtake", "A (10 seconds)");
+            telemetry.addData("Outtake Power: ", drive.outtake.getPower());
             telemetry.addData("Outtake ticks: ", outtakeTicks);
             telemetry.addData("Prev outtake ticks: ", prevOuttakeTicks);
             telemetry.addData("deltaTime ", time.getDeltaTime());
             telemetry.addData("Outtake velocity", String.format(Locale.getDefault(),"%.4f", drive.outtake.getPower()));            telemetry.addData("Incline",drive.outtakeIncline.getPosition());
             telemetry.addData("Backplate",drive.outtakeBackplate.getPosition());
+            //This is the commanded angle relative to center, not measured servo feedback.
+            telemetry.addData("Backplate commanded angle (degrees)",
+                    (drive.outtakeBackplate.getPosition() - 0.5) * SERVO_RANGE_DEGREES);
+            telemetry.addData("Flowers", flowersDown ? "Down" : "Up");
             telemetry.update();
+        }
+        } finally {
+            //Stop the outtake if the OpMode ends or exits with an exception.
+            drive.outtake.setPower(0);
         }
     }
 }

@@ -26,15 +26,17 @@ package org.firstinspires.ftc.robotcontroller.external.utilities;
         THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
-import com.qualcomm.robotcore.eventloop.opmode.Utility;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.Gamepad;
 
 /*
  * This OpMode helps test the gamepads so you can make sure they are functional.
  *
  */
-@Utility(name = "Test Gamepad", description = "Test gamepads on your driver station")
+@TeleOp(name = "Test Gamepad", group = "Utility")
+@Disabled
 @SuppressWarnings("unused")
 public class UtilityTestGamepad extends OpMode {
 

@@ -11,10 +11,8 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.internal.camera.calibration.CameraCalibration;
 import org.firstinspires.ftc.vision.VisionPortal;
-import org.firstinspires.ftc.vision.apriltag.AprilTagClusterDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
-import org.firstinspires.ftc.vision.apriltag.AprilTagSingleDetection;
 import org.opencv.core.Mat;
 
 import java.util.ArrayList;
@@ -58,37 +56,24 @@ public class AprilTagWebcam {
         public void displayDetectionTelemetry(AprilTagDetection detectedID){
             if(detectedID == null) {return;}
 
-            if (detectedID instanceof AprilTagSingleDetection) {
-                AprilTagSingleDetection singleDet = (AprilTagSingleDetection) detectedID;
-                if (singleDet.metadata != null) {
-                    telemetry.addLine(String.format("\n==== (ID %d) %s", singleDet.id, singleDet.metadata.name));
-                    telemetry.addLine(String.format("XYZ %6.1f %6.1f %6.1f  (inch)", detectedID.ftcPose.x, detectedID.ftcPose.y, detectedID.ftcPose.z));
-                    telemetry.addLine(String.format("PRY %6.1f %6.1f %6.1f  (deg)", detectedID.ftcPose.pitch, detectedID.ftcPose.roll, detectedID.ftcPose.yaw));
-                    telemetry.addLine(String.format("RBE %6.1f %6.1f %6.1f  (inch, deg, deg)", detectedID.ftcPose.range, detectedID.ftcPose.bearing, detectedID.ftcPose.elevation));
-                } else {
-                    telemetry.addLine(String.format("\n==== (ID %d) Unknown", singleDet.id));
-                    telemetry.addLine(String.format("Center %6.0f %6.0f   (pixels)", singleDet.center.x, singleDet.center.y));
-                }
-            } else {
-                AprilTagClusterDetection clusterDet = (AprilTagClusterDetection) detectedID;
-                telemetry.addLine(String.format("\n==== Tag Cluster (%s)", clusterDet.metadata.name));
-                telemetry.addLine(String.format("Percent tags found: %d", clusterDet.percentClusterFound));
+            if (detectedID.metadata != null) {
+                telemetry.addLine(String.format("\n==== (ID %d) %s", detectedID.id, detectedID.metadata.name));
                 telemetry.addLine(String.format("XYZ %6.1f %6.1f %6.1f  (inch)", detectedID.ftcPose.x, detectedID.ftcPose.y, detectedID.ftcPose.z));
                 telemetry.addLine(String.format("PRY %6.1f %6.1f %6.1f  (deg)", detectedID.ftcPose.pitch, detectedID.ftcPose.roll, detectedID.ftcPose.yaw));
                 telemetry.addLine(String.format("RBE %6.1f %6.1f %6.1f  (inch, deg, deg)", detectedID.ftcPose.range, detectedID.ftcPose.bearing, detectedID.ftcPose.elevation));
+            } else {
+                telemetry.addLine(String.format("\n==== (ID %d) Unknown", detectedID.id));
+                telemetry.addLine(String.format("Center %6.0f %6.0f   (pixels)", detectedID.center.x, detectedID.center.y));
             }
         }
 
         public AprilTagDetection getTagBySpecificID(int id){
             for(AprilTagDetection detection: detectedTags){
-                if (detection instanceof AprilTagSingleDetection) {
-                    AprilTagSingleDetection singleDet = (AprilTagSingleDetection) detection;
-                    if(singleDet.id == id){
-                        return detection;
-                    }
+                if(detection.id == id){
+                    return detection;
                 }
             }
-        return null;
+            return null;
         }
         public void stop() {
             if(visionPortal != null) {
