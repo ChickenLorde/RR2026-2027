@@ -44,6 +44,7 @@ import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
+import org.firstinspires.ftc.vision.apriltag.AprilTagSingleDetection;
 
 import java.util.List;
 
@@ -98,12 +99,15 @@ public class CameraTest extends LinearOpMode {
 
         for(AprilTagDetection detection : currentDetections)
         {
-            switch(detection.id)
-            {
-                case 21: colorPattern = Pattern.GPP; break;
-                case 22: colorPattern = Pattern.PGP; break;
-                case 23: colorPattern = Pattern.PPG; break;
-                default: colorPattern = null; break;
+            if (detection instanceof AprilTagSingleDetection) {
+                AprilTagSingleDetection singleDet = (AprilTagSingleDetection) detection;
+                switch(singleDet.id)
+                {
+                    case 21: colorPattern = Pattern.GPP; break;
+                    case 22: colorPattern = Pattern.PGP; break;
+                    case 23: colorPattern = Pattern.PPG; break;
+                    default: colorPattern = null; break;
+                }
             }
         }
     }
