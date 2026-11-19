@@ -9,6 +9,7 @@ public class PID_Test {
     private double derivative;
 
     private double prevDifference;
+    private final double MAX_INTEGRAL = 1.0;
 
     private final Time time;
 
@@ -34,13 +35,20 @@ public class PID_Test {
 
         double difference = target - currentValue;
         integral += difference * time.getDeltaTime();
+        integral = Math.max(-MAX_INTEGRAL, Math.min(MAX_INTEGRAL, integral));
         derivative = (difference - prevDifference) / time.getDeltaTime();
         prevDifference = difference;
 
         double raw = (Kp * difference) + (Ki * integral) + (Kd * derivative);
 
         double scaled = raw;
-        return raw;
+        return Math.tanh(raw);
+    }
+
+    public void reset() {
+        integral = 0;
+        prevDifference = 0;
+        derivative = 0;
     }
 
 }

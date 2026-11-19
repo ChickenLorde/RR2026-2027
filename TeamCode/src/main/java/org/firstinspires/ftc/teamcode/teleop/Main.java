@@ -8,7 +8,9 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.teamcode.Utility.Time;
 
 import org.firstinspires.ftc.teamcode.Utility.Vector2;
+import org.firstinspires.ftc.teamcode.mechanisms.AprilTagWebcam;
 import org.firstinspires.ftc.teamcode.parts.Driver;
+import org.firstinspires.ftc.teamcode.subsystems.PID_Test;
 
 import java.util.Locale;
 
@@ -66,6 +68,18 @@ public class Main extends LinearOpMode {
     public double deltaLeftDistance; //Unused
     public double deltaRightDistance; //Unused
 
+    public enum AimMode {
+        MANUAL, HIVE
+    }
+
+    private AimMode[] aimModeValues = AimMode.values();
+
+    public AimMode currentAimMode;
+
+    PID_Test hiveAimPid = new PID_Test(0.04, 0, 0.0);
+
+    public AprilTagWebcam webCam = new AprilTagWebcam();;
+
     public void runOpMode() throws InterruptedException {
 
         //Driver holds the motors, servos and position tracker; map the flower servos separately
@@ -77,6 +91,10 @@ public class Main extends LinearOpMode {
         //Start both servos at 0 degrees
         backplateServoPosition = 0;
         inclineServoPosition = 0;
+
+        currentAimMode = AimMode.MANUAL;
+
+        webCam.init(hardwareMap, telemetry);
         waitForStart(); //Wait for Play to be pressed
         double timeTest = 0; //Unused
         double rate = 0.0065; //Unused
@@ -104,14 +122,18 @@ public class Main extends LinearOpMode {
             //A starts or restarts the timed outtake run; holding A does not restart the timer.
             boolean aPressed = gamepad1.a;
             if (aPressed && !prevA) {
-                outtakeTimer.reset();
-                outtakeRunning = true;
+                //outtakeTimer.reset();
+                //outtakeRunning = true;
+
+                currentAimMode = aimModeValues[(currentAimMode.ordinal() + 1) % aimModeValues.length];
+                if(currentAimMode == AimMode.HIVE)
+                    hiveAimPid.reset();
             }
             prevA = aPressed;
-            if (outtakeRunning && outtakeTimer.seconds() >= OUTTAKE_RUN_SECONDS) {
-                outtakeRunning = false;
-            }
-            drive.outtake.setPower(outtakeRunning ? 1.0 : 0.0);
+            //if (outtakeRunning && outtakeTimer.seconds() >= OUTTAKE_RUN_SECONDS) {
+                //outtakeRunning = false;
+            //}
+            //drive.outtake.setPower(outtakeRunning ? 1.0 : 0.0);
             //Backplate servo
             //Y / B set the target angle (degrees); it is converted to 0-1 and sent to the servo
             if(gamepad1.y) backplateServoPosition = pollenAngle;
@@ -154,6 +176,10 @@ public class Main extends LinearOpMode {
                 double x_speed = -gamepad1.left_stick_x; //Strafe input
                 double y_speed = gamepad1.left_stick_y; //Forward/back input
                 double rot = -gamepad1.right_stick_x; //Rotation input
+
+                if(currentAimMode == AimMode.HIVE)
+                    rot = HiveAimMode();
+
                 double motorPower = 1.0; //Fixed max power scale
                 double denominator = Math.max(Math.abs(y_speed) + Math.abs(x_speed) + Math.abs(rot), 1); //Scales powers so none exceed 1
                 //Per-wheel power before the power multiplier
@@ -188,21 +214,40 @@ public class Main extends LinearOpMode {
             //Driver Station telemetry
             telemetry.addData("Wheel Motor Power",power);
             telemetry.addData("Outtake", "A (10 seconds)");
-            telemetry.addData("Outtake Power: ", drive.outtake.getPower());
-            telemetry.addData("Outtake ticks: ", outtakeTicks);
-            telemetry.addData("Prev outtake ticks: ", prevOuttakeTicks);
-            telemetry.addData("deltaTime ", time.getDeltaTime());
-            telemetry.addData("Outtake velocity", String.format(Locale.getDefault(),"%.4f", drive.outtake.getPower()));            telemetry.addData("Incline",drive.outtakeIncline.getPosition());
+            //telemetry.addData("Outtake Power: ", drive.outtake.getPower());
+            //telemetry.addData("Outtake ticks: ", outtakeTicks);
+            //telemetry.addData("Prev outtake ticks: ", prevOuttakeTicks);
+            //telemetry.addData("deltaTime ", time.getDeltaTime());
+            //telemetry.addData("Outtake velocity", String.format(Locale.getDefault(),"%.4f", drive.outtake.getPower()));            telemetry.addData("Incline",drive.outtakeIncline.getPosition());
             telemetry.addData("Backplate",drive.outtakeBackplate.getPosition());
             //This is the commanded angle relative to center, not measured servo feedback.
             telemetry.addData("Backplate commanded angle (degrees)",
                     (drive.outtakeBackplate.getPosition() - 0.5) * SERVO_RANGE_DEGREES);
             telemetry.addData("Flowers", flowersDown ? "Down" : "Up");
+            telemetry.addData("Aim Mode", currentAimMode);
+            telemetry.addData("Last Bearing", webCam.getBearing());
+            telemetry.addData("Cam FPS", webCam.getFps());
+
+            UpdateWebcam();
             telemetry.update();
         }
         } finally {
             //Stop the outtake if the OpMode ends or exits with an exception.
             drive.outtake.setPower(0);
         }
+    }
+
+    private void UpdateWebcam() {
+        webCam.update();
+        webCam.displayAllDetectionTelemetry();
+    }
+
+    private double HiveAimMode() {
+        hiveAimPid.setTarget(0);
+        double rotate = hiveAimPid.calculate(webCam.getBearing());
+
+        if(Math.abs(webCam.getBearing()) < 4) return 0;
+
+        return rotate * 0.45;
     }
 }
