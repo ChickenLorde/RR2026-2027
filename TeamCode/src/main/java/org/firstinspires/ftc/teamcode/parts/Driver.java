@@ -1,20 +1,16 @@
 package org.firstinspires.ftc.teamcode.parts;
 
 import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
-import org.firstinspires.ftc.teamcode.Utility.Pos2D;
 import org.firstinspires.ftc.teamcode.Utility.Time;
 import org.firstinspires.ftc.teamcode.Utility.Vector2;
 import org.firstinspires.ftc.teamcode.mechanisms.PositionTracker;
-import org.firstinspires.ftc.teamcode.subsystems.Robot;
 
 import org.firstinspires.ftc.teamcode.subsystems.PID_Test;
 
-import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Servo;
 
 public class Driver {
@@ -30,6 +26,8 @@ public class Driver {
     public DcMotor outtake;
     public Servo outtakeIncline;
     public Servo outtakeBackplate;
+
+    public Servo servoGate;
 
     public Servo flowerLeft, flowerRight;
 
@@ -65,6 +63,7 @@ public class Driver {
         outtakeBackplate = hardwareMap.get(Servo.class, "backplate");
         intake = hardwareMap.dcMotor.get("intake");
         positionTracker = new PositionTracker(this, new Vector2(0, 0));
+        servoGate = hardwareMap.get(Servo.class, "servoGate");
 
 
         Kp = 1.5;

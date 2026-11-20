@@ -44,11 +44,13 @@ public class AprilTagWebcam {
                 .setDrawCubeProjection(true)
                 .setOutputUnits(DistanceUnit.INCH, AngleUnit.DEGREES)
                 .build();
+        // Use 2x decimation to reduce image work while retaining more detail than stronger decimation.
         aprilTagProcessor.setDecimation(2);
         VisionPortal.Builder builder = new VisionPortal.Builder();
         builder.setCamera(hwMap.get(WebcamName.class,"Webcam 1"));
         builder.setCameraResolution(new Size(640, 480));
         builder.addProcessor(aprilTagProcessor);
+        // Detection data is still available; this only disables the camera preview.
         builder.enableLiveView(false);
 
         visionPortal = builder.build();
@@ -58,6 +60,7 @@ public class AprilTagWebcam {
     }
 
     private void applyManualExposure() {
+        // Camera controls are only available once streaming has started; apply settings once.
         if (exposureSet || visionPortal.getCameraState() != VisionPortal.CameraState.STREAMING) {
             return;
         }
@@ -65,6 +68,7 @@ public class AprilTagWebcam {
         GainControl gainControl = visionPortal.getCameraControl(GainControl.class);
 
         if (exposureControl != null && gainControl != null) {
+            // A short exposure and higher gain help keep moving tags sharp and visible.
             exposureControl.setMode(ExposureControl.Mode.Manual);
             exposureControl.setExposure(5, TimeUnit.MILLISECONDS);
             gainControl.setGain(220);
@@ -89,12 +93,14 @@ public class AprilTagWebcam {
         if(detected instanceof AprilTagClusterDetection)
         {
             cluster = (AprilTagClusterDetection) detected;
+            // Only tags whose configured name starts with R are used for Hive aiming.
             if(cluster.metadata != null && cluster.metadata.name.charAt(0) != 'R') return;
             lastBearing = cluster.ftcPose.bearing;
         }
         if(detected instanceof AprilTagSingleDetection)
         {
             single = (AprilTagSingleDetection) detected;
+            // Keep the same tag filter for individual detections and clusters.
             if(single.metadata != null && single.metadata.name.charAt(0) != 'R') return;
             lastBearing = single.ftcPose.bearing;
         }
@@ -123,6 +129,7 @@ public class AprilTagWebcam {
     }
 
     public double getBearing() {
+        // Bearing is the horizontal angle to the most recently accepted tag, in degrees.
         return lastBearing;
     }
 

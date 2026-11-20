@@ -9,6 +9,7 @@ public class PID_Test {
     private double derivative;
 
     private double prevDifference;
+    // Bound accumulated error so prolonged error cannot grow the integral term without limit.
     private final double MAX_INTEGRAL = 1.0;
 
     private final Time time;
@@ -42,10 +43,12 @@ public class PID_Test {
         double raw = (Kp * difference) + (Ki * integral) + (Kd * derivative);
 
         double scaled = raw;
+        // Smoothly constrain the controller output to [-1, 1] for motor power use.
         return Math.tanh(raw);
     }
 
     public void reset() {
+        // Clear accumulated/history terms when automatic aiming is enabled again.
         integral = 0;
         prevDifference = 0;
         derivative = 0;
