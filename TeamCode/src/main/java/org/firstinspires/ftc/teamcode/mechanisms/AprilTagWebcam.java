@@ -89,13 +89,13 @@ public class AprilTagWebcam {
         if(detected instanceof AprilTagClusterDetection)
         {
             cluster = (AprilTagClusterDetection) detected;
-            if(cluster.metadata != null && cluster.metadata.name.charAt(0) != 'R') return;
+            if(cluster.metadata == null || cluster.metadata.name.charAt(0) != 'R') return;
             lastBearing = cluster.ftcPose.bearing;
         }
         if(detected instanceof AprilTagSingleDetection)
         {
             single = (AprilTagSingleDetection) detected;
-            if(single.metadata != null && single.metadata.name.charAt(0) != 'R') return;
+            if(single.metadata == null || single.metadata.name.charAt(0) != 'R') return;
             lastBearing = single.ftcPose.bearing;
         }
         if(cluster == null && single == null) return;

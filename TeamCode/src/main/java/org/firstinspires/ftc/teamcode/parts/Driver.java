@@ -27,7 +27,7 @@ public class Driver {
 
     public DcMotor intake;
 
-    public DcMotor outtake;
+    public DcMotorEx outtake;
     public Servo outtakeIncline;
     public Servo outtakeBackplate;
 
@@ -60,7 +60,9 @@ public class Driver {
         backLeftMotor =  hardwareMap.dcMotor.get("backLeft");
         frontRightMotor =  hardwareMap.dcMotor.get("frontRight");
         backRightMotor =  hardwareMap.dcMotor.get("backRight");
-        outtake = hardwareMap.dcMotor.get("outtake");
+        outtake = hardwareMap.get(DcMotorEx.class, "outtake");
+
+        outtake.setVelocityPIDFCoefficients(10, 0, 0, 11.7);
         outtakeIncline = hardwareMap.get(Servo.class,"incline");
         outtakeBackplate = hardwareMap.get(Servo.class, "backplate");
         intake = hardwareMap.dcMotor.get("intake");
@@ -118,8 +120,8 @@ public class Driver {
 
     public void easePower(DcMotor motor, double power, double deltaTime)
     {
-        if(motor.getPower() < power) motor.setPower(motor.getPower() + 5 * deltaTime);
-        else if (motor.getPower() > power) motor.setPower(motor.getPower() -5 * deltaTime);
+        if(motor.getPower() < power) motor.setPower(motor.getPower() + 6 * deltaTime);
+        else if (motor.getPower() > power) motor.setPower(motor.getPower() -6 * deltaTime);
 
         if(Math.abs(motor.getPower() - power) < 0.05) motor.setPower(power);
     }

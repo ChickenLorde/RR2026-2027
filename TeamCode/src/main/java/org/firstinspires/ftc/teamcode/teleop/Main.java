@@ -42,7 +42,7 @@ public class Main extends LinearOpMode {
     //Target angles in degrees - tune these
     static final double nectarAngle = 300; //Backplate target when B is pressed (clamped to the servo range)
     static final double pollenAngle = -300; //Backplate target when Y is pressed (clamped to the servo range)
-    static final double INCLINE_STEP_DEGREES = 90; //Incline change per D-pad up/down press
+    static final double INCLINE_STEP_DEGREES = 15; //Incline change per D-pad up/down press
     static final double pollen_RMP = 0.5843; //Unused
     static final double nectar_RMP = 0.7778; //Unused
     static final double FLOWER_DOWN_DEGREES = 90; //Flower target when lowered
@@ -52,6 +52,14 @@ public class Main extends LinearOpMode {
     boolean prevDpadDown = false; //D-pad down state last loop, used to detect a new press
     boolean prevX = false; //Previous X state, used to detect a new press
     boolean flowersDown = false; //Current flower target; starts raised
+
+    double outtakePowerPercent = 1.0;
+    boolean wasLeftDPadPressed = false;
+    boolean wasRightDPadPressed = false;
+
+    //55.9
+
+    double outtakeVelocity = 0;
 
     //Backplate angles are relative to the servo's center: 0 = middle, +/- = either side (clamped to +/- half the range)
     static double centeredAngleToPosition(double degrees) {
@@ -68,6 +76,8 @@ public class Main extends LinearOpMode {
     public double deltaLeftDistance; //Unused
     public double deltaRightDistance; //Unused
 
+    double cuurentBackboardAngle = 0;
+
     public enum AimMode {
         MANUAL, HIVE
     }
@@ -76,7 +86,7 @@ public class Main extends LinearOpMode {
 
     public AimMode currentAimMode;
 
-    PID_Test hiveAimPid = new PID_Test(0.04, 0, 0.0);
+    PID_Test hiveAimPid = new PID_Test(0.06, 0, 0.0);
 
     public AprilTagWebcam webCam = new AprilTagWebcam();;
 
@@ -91,6 +101,8 @@ public class Main extends LinearOpMode {
         //Start both servos at 0 degrees
         backplateServoPosition = 0;
         inclineServoPosition = 0;
+
+
 
         currentAimMode = AimMode.MANUAL;
 
@@ -118,7 +130,24 @@ public class Main extends LinearOpMode {
 
             //region scoring
             //Each bumper contributes positive power to the intake.
-            drive.intake.setPower((gamepad1.left_bumper ? 1 : 0) - (gamepad1.right_bumper ? -1 : 0));
+            drive.intake.setPower(((gamepad1.left_bumper && outtakeVelocity > 1200 || gamepad1.left_trigger > 0 ? 1.0 : 0) - (gamepad1.right_bumper ? -1 : 0)));
+            drive.outtake.setVelocity(gamepad1.left_bumper || gamepad1.right_trigger > 0 ? outtakePowerPercent : 0);
+
+            boolean dpadL = gamepad1.dpad_left;
+            boolean dpadR = gamepad1.dpad_right;
+
+            if(dpadL && !wasLeftDPadPressed) {
+                wasLeftDPadPressed = true;
+                outtakePowerPercent = Math.min(2000, outtakePowerPercent + 20);
+            }
+            if(dpadR && !wasRightDPadPressed) {
+                wasRightDPadPressed = true;
+                outtakePowerPercent = Math.max(0, outtakePowerPercent - 20);
+            }
+
+            if(!dpadL) wasLeftDPadPressed = false;
+            if(!dpadR) wasRightDPadPressed = false;
+
             //A starts or restarts the timed outtake run; holding A does not restart the timer.
             boolean aPressed = gamepad1.a;
             if (aPressed && !prevA) {
@@ -188,10 +217,10 @@ public class Main extends LinearOpMode {
                 double frontRightPower = (y_speed - x_speed - rot) / denominator * motorPower;
                 double backRightPower = (y_speed + x_speed - rot) / denominator * motorPower;
 
-                drive.easePower(drive.frontLeftMotor, frontLeftPower * power, time.getDeltaTime());
-                drive.easePower(drive.frontRightMotor, frontRightPower * power, time.getDeltaTime());
-                drive.easePower(drive.backLeftMotor, backLeftPower * power, time.getDeltaTime());
-                drive.easePower(drive.backRightMotor, backRightPower * power, time.getDeltaTime());
+                drive.frontLeftMotor.setPower(frontLeftPower * power);
+                drive.frontRightMotor.setPower(frontRightPower * power);
+                drive.backLeftMotor.setPower(backLeftPower * power);
+                drive.backRightMotor.setPower(backRightPower * power);
                 /*drive.frontLeftMotor.setPower(frontLeftPower * power);
                 drive.frontRightMotor.setPower(frontRightPower * power);
                 drive.backLeftMotor.setPower(backLeftPower * power);
@@ -207,26 +236,27 @@ public class Main extends LinearOpMode {
 
                 //Estimate outtake encoder speed from the change in ticks since the last loop.
                 int outtakeTicks = drive.outtake.getCurrentPosition();
-                double outtakeVelocity = (outtakeTicks - prevOuttakeTicks) / time.getDeltaTime();
+                outtakeVelocity = (outtakeTicks - prevOuttakeTicks) / time.getDeltaTime();
                 prevOuttakeTicks = outtakeTicks;
 
             //endregion
             //Driver Station telemetry
             telemetry.addData("Wheel Motor Power",power);
-            telemetry.addData("Outtake", "A (10 seconds)");
+            telemetry.addData("Outtake Power Percent", outtakePowerPercent);
             //telemetry.addData("Outtake Power: ", drive.outtake.getPower());
             //telemetry.addData("Outtake ticks: ", outtakeTicks);
             //telemetry.addData("Prev outtake ticks: ", prevOuttakeTicks);
             //telemetry.addData("deltaTime ", time.getDeltaTime());
-            //telemetry.addData("Outtake velocity", String.format(Locale.getDefault(),"%.4f", drive.outtake.getPower()));            telemetry.addData("Incline",drive.outtakeIncline.getPosition());
-            telemetry.addData("Backplate",drive.outtakeBackplate.getPosition());
+            telemetry.addData("Outtake velocity", outtakeVelocity);
+            //telemetry.addData("Incline",drive.outtakeIncline.getPosition());
+            //telemetry.addData("Backplate",drive.outtakeBackplate.getPosition()); //
             //This is the commanded angle relative to center, not measured servo feedback.
             telemetry.addData("Backplate commanded angle (degrees)",
-                    (drive.outtakeBackplate.getPosition() - 0.5) * SERVO_RANGE_DEGREES);
+                    inclineServoPosition);
             telemetry.addData("Flowers", flowersDown ? "Down" : "Up");
             telemetry.addData("Aim Mode", currentAimMode);
             telemetry.addData("Last Bearing", webCam.getBearing());
-            telemetry.addData("Cam FPS", webCam.getFps());
+            //telemetry.addData("Cam FPS", webCam.getFps());
 
             UpdateWebcam();
             telemetry.update();
