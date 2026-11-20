@@ -1,11 +1,13 @@
 package org.firstinspires.ftc.teamcode.parts;
 
+import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.teamcode.Utility.Pos2D;
 import org.firstinspires.ftc.teamcode.Utility.Time;
 import org.firstinspires.ftc.teamcode.Utility.Vector2;
@@ -15,6 +17,7 @@ import org.firstinspires.ftc.teamcode.subsystems.Robot;
 import org.firstinspires.ftc.teamcode.subsystems.PID_Test;
 
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.Servo;
 
 public class Driver {
@@ -51,9 +54,31 @@ public class Driver {
     * 1 meter = 1529 ticks
      */
 
+
+    public double GetYawRadians ()
+    {
+        double radians = imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.RADIANS);
+
+        //radians = ((radians) % twoPi + twoPi) % twoPi;
+
+        return radians;
+    }
+
     Telemetry telemetry;
+
+    IMU imu;
     public Driver(HardwareMap hardwareMap, Telemetry telemetry) {
         this.telemetry = telemetry;
+
+        imu = hardwareMap.get(IMU.class, "imu");
+        IMU.Parameters parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
+                RevHubOrientationOnRobot.LogoFacingDirection.RIGHT,
+                RevHubOrientationOnRobot.UsbFacingDirection.UP
+        ));
+
+        imu.initialize(parameters);
+        imu.resetYaw();
+
 
         //Control buttons
         frontLeftMotor =  hardwareMap.dcMotor.get("frontLeft");
