@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.parts;
 
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
@@ -23,7 +24,7 @@ public class Driver {
 
     public DcMotor intake;
 
-    public DcMotor outtake;
+    public DcMotorEx outtake;
     public Servo outtakeIncline;
     public Servo outtakeBackplate;
 
@@ -58,7 +59,7 @@ public class Driver {
         backLeftMotor =  hardwareMap.dcMotor.get("backLeft");
         frontRightMotor =  hardwareMap.dcMotor.get("frontRight");
         backRightMotor =  hardwareMap.dcMotor.get("backRight");
-        outtake = hardwareMap.dcMotor.get("outtake");
+        outtake = hardwareMap.get(DcMotorEx.class, "outtake");
         outtakeIncline = hardwareMap.get(Servo.class,"incline");
         outtakeBackplate = hardwareMap.get(Servo.class, "backplate");
         intake = hardwareMap.dcMotor.get("intake");
@@ -83,6 +84,7 @@ public class Driver {
         backRightMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
 
+        outtake.setVelocityPIDFCoefficients(20,0,0,11.7);
         frontLeftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         backLeftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         frontRightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);

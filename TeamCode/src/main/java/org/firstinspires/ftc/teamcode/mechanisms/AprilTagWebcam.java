@@ -32,6 +32,7 @@ public class AprilTagWebcam {
     private Telemetry telemetry;
 
     private double lastBearing = 0;
+    private double lastRange = 0;
     private boolean exposureSet = false;
 
     public void init(HardwareMap hwMap, Telemetry telemetry) {
@@ -94,15 +95,17 @@ public class AprilTagWebcam {
         {
             cluster = (AprilTagClusterDetection) detected;
             // Only tags whose configured name starts with R are used for Hive aiming.
-            if(cluster.metadata != null && cluster.metadata.name.charAt(0) != 'R') return;
+            if(cluster.metadata == null || cluster.metadata.name.charAt(0) != 'R') return;
             lastBearing = cluster.ftcPose.bearing;
+            lastRange = cluster.ftcPose.range;
         }
         if(detected instanceof AprilTagSingleDetection)
         {
             single = (AprilTagSingleDetection) detected;
             // Keep the same tag filter for individual detections and clusters.
-            if(single.metadata != null && single.metadata.name.charAt(0) != 'R') return;
+            if(single.metadata == null || single.metadata.name.charAt(0) != 'R') return;
             lastBearing = single.ftcPose.bearing;
+            lastRange = single.ftcPose.range;
         }
         if(cluster == null && single == null) return;
 
@@ -131,6 +134,11 @@ public class AprilTagWebcam {
     public double getBearing() {
         // Bearing is the horizontal angle to the most recently accepted tag, in degrees.
         return lastBearing;
+    }
+
+    public double getRange() {
+        // Range is the linear distance to the most recently accepted tag, in inches.
+        return lastRange;
     }
 
     public double getFps() {

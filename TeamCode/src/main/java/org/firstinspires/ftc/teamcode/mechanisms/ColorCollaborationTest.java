@@ -1,13 +1,23 @@
 package org.firstinspires.ftc.teamcode.mechanisms;
 
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
 import com.qualcomm.robotcore.hardware.NormalizedRGBA;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
-public class ColorCollaborationTest {
+@TeleOp(name = "Color Sensing",group = "Competition Modes")
+public class ColorCollaborationTest extends LinearOpMode {
     NormalizedColorSensor colorSensor;
+
+    @Override
+    public void runOpMode() throws InterruptedException {
+        while(opModeIsActive()) {
+            getDetectedColor(telemetry);
+        }
+    }
 
     public enum DetectedColor {
         RED,
