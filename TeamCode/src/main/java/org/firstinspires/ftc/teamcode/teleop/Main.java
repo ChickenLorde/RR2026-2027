@@ -209,12 +209,23 @@ public class Main extends LinearOpMode {
             //region driving
                 //Mecanum drive: left stick = forward/back + strafe, right stick = rotation.
                 //Wheel powers are scaled down if any would exceed 1, then multiplied by power and eased
-                double x_speed = -gamepad1.left_stick_x; //Strafe input
-                double y_speed = gamepad1.left_stick_y; //Forward/back input
+                double x_speed = gamepad1.left_stick_x; //Strafe input
+                double y_speed = -gamepad1.left_stick_y; //Forward/back input
                 double rot = -gamepad1.right_stick_x; //Rotation input
 
                 if(currentAimMode == AimMode.HIVE)
                     rot = HiveAimMode();
+
+                double curAngle = drive.GetYawRadians();
+                //drive.positionTracker.getDirection();
+                double[] fieldXY = robotToFieldCentric (x_speed, y_speed, curAngle);
+
+                double field_xspeed = fieldXY[0];
+                double field_yspeed = fieldXY[1];
+
+                // Change the variables here so we don't have to change them below
+                x_speed = field_xspeed;
+                y_speed = field_yspeed;
 
                 double motorPower = 1.0; //Fixed max power scale
                 double denominator = Math.max(Math.abs(y_speed) + Math.abs(x_speed) + Math.abs(rot), 1); //Scales powers so none exceed 1
@@ -277,6 +288,18 @@ public class Main extends LinearOpMode {
     private void UpdateWebcam() {
         webCam.update();
         webCam.displayAllDetectionTelemetry();
+    }
+
+    static double[] robotToFieldCentric (double vxRobot, double vyRobot, double cur_angle_degrees)
+    {
+
+        double cos = Math.cos(cur_angle_degrees);
+        double sin = Math.sin(cur_angle_degrees);
+
+        double vxField = vxRobot * cos + vyRobot * sin;
+        double vyField = -vxRobot * sin + vyRobot * cos;
+
+        return new double[] { vxField, vyField };
     }
 
     private double HiveAimMode() {
