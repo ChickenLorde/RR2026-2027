@@ -4,15 +4,13 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
-import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+
 import org.firstinspires.ftc.teamcode.Utility.Time;
 
-import org.firstinspires.ftc.teamcode.Utility.Vector2;
 import org.firstinspires.ftc.teamcode.mechanisms.AprilTagWebcam;
+import org.firstinspires.ftc.teamcode.mechanisms.ColorSensor;
 import org.firstinspires.ftc.teamcode.parts.Driver;
-import org.firstinspires.ftc.teamcode.subsystems.PID_Test;
-
-import java.util.Locale;
+import org.firstinspires.ftc.teamcode.subsystems.PidControl;
 
 @TeleOp(name = "Main TeleOp",group = "Competition Modes")
 public class Main extends LinearOpMode {
@@ -24,17 +22,10 @@ public class Main extends LinearOpMode {
                 return;
     }
     double power = 1; //Drive power multiplier; D-pad adjustment below is disabled
-
     int prevOuttakeTicks = 0; //Previous outtake encoder reading for the velocity calculation
     Time time = new Time(); //Timer helper: provides getTimer(), resetTime() and getDeltaTime()
-    public Vector2 pos = new Vector2(); //In ticks (unused)
-
-    public double direction; //In Degrees (unused)
 
     public Driver drive; //Hardware container: motors, servos and position tracker
-
-    public double previousLeftDistance; //Unused
-    public double previousRightDistance; //Unused
 
 
     //Assumed servo travel in degrees corresponding to a position change from 0.0 to 1.0
@@ -43,8 +34,6 @@ public class Main extends LinearOpMode {
     static final double nectarAngle = 300; //Backplate target when B is pressed (clamped to the servo range)
     static final double pollenAngle = -300; //Backplate target when Y is pressed (clamped to the servo range)
     static final double INCLINE_STEP_DEGREES = 15; //Incline change per D-pad up/down press
-    static final double pollen_RMP = 0.5843; //Unused
-    static final double nectar_RMP = 0.7778; //Unused
     static final double FLOWER_DOWN_DEGREES = 90; //Flower target when lowered
     static final double FLOWER_UP_DEGREES = 360; //Flower target when raised
     static final double OUTTAKE_RUN_SECONDS = 5.0; //Duration of each timed outtake run
@@ -53,13 +42,14 @@ public class Main extends LinearOpMode {
     boolean prevX = false; //Previous X state, used to detect a new press
     boolean flowersDown = false; //Current flower target; starts raised
 
-    double outtakePowerPercent = 1700;
+    double outtakeTargetVelocity = 1700;
     boolean wasLeftDPadPressed = false;
     boolean wasRightDPadPressed = false;
 
     //55.9, power: 1700, angle: 135
     //45, power: 1590, angle: 0
     double outtakeVelocity = 0;
+
 
     //Backplate angles are relative to the servo's center: 0 = middle, +/- = either side (clamped to +/- half the range)
     static double centeredAngleToPosition(double degrees) {
@@ -73,13 +63,9 @@ public class Main extends LinearOpMode {
 
     public double backplateServoPosition; //Current backplate target angle, in degrees
     public double inclineServoPosition; //Current incline target angle, in degrees
-    public double deltaLeftDistance; //Unused
-    public double deltaRightDistance; //Unused
 
     private double lastBackplateIncrement;
     private final double backplateIncrementDeadzone = 12;
-
-    double cuurentBackboardAngle = 0;
 
     //far angle 135
     //far power 1670
@@ -88,13 +74,27 @@ public class Main extends LinearOpMode {
         MANUAL, HIVE
     }
 
+    public enum IntakeMode {
+        NECTAR, POLLEN
+    }
+
+    public enum Alliance {
+        RED, BLUE
+    }
+
     private AimMode[] aimModeValues = AimMode.values();
 
-    public AimMode currentAimMode;
+    private Alliance alliance = Alliance.RED;
 
-    PID_Test hiveAimPid = new PID_Test(0.06, 0, 0.0);
+    public AimMode aimMode;
+    public IntakeMode intakeMode;
 
-    public AprilTagWebcam webCam = new AprilTagWebcam();;
+    PidControl hiveAimPid = new PidControl(0.06, 0, 0.0);
+
+    public AprilTagWebcam webCam = new AprilTagWebcam();
+    public ColorSensor colorSensor = new ColorSensor();
+
+    private double colorSensorUpdateTimer;
 
     public void runOpMode() throws InterruptedException {
 
@@ -104,28 +104,39 @@ public class Main extends LinearOpMode {
         drive.flowerRight = hardwareMap.get(Servo.class, "flowerRight");
         drive.flowerRight.setDirection(Servo.Direction.REVERSE); //Compensate for mirrored mounting
 
+        InitializeMechanisms();
+
         //Start both servos at 0 degrees
         backplateServoPosition = 0;
         inclineServoPosition = 135;
 
 
+        aimMode = AimMode.MANUAL;
 
-        currentAimMode = AimMode.MANUAL;
+        boolean prevA = false;
 
-        webCam.init(hardwareMap, telemetry);
-        waitForStart(); //Wait for Play to be pressed
+        while(!isStarted() && !isStopRequested()) {
+            boolean aPressed = gamepad1.a;
+            if(aPressed && !prevA) {
+                if(alliance == Alliance.BLUE) alliance = Alliance.RED;
+                else alliance = Alliance.BLUE;
+            }
+            prevA = aPressed;
+        }
+        prevA = false;
         double timeTest = 0; //Unused
         double rate = 0.0065; //Unused
         //Track the timed outtake run and detect new A presses without blocking the drive loop.
         ElapsedTime outtakeTimer = new ElapsedTime();
         boolean outtakeRunning = false;
-        boolean prevA = false;
+
         try {
         while(opModeIsActive())
         {
 
             time.update();
-            telemetry.addData("Timer: ",time.getTimer());
+            colorSensorUpdateTimer += time.getDeltaTime();
+            //telemetry.addData("Timer: ",time.getTimer());
             //Every 0.1s, D-pad left/right lowers/raises the drive power by 0.05
             /*if(time.getTimer() >= 0.1)
             {
@@ -137,18 +148,18 @@ public class Main extends LinearOpMode {
             //region scoring
             //Each bumper contributes positive power to the intake.
             drive.intake.setPower(((gamepad1.left_bumper && outtakeVelocity > 1200 || gamepad1.left_trigger > 0 ? 1.0 : 0) - (gamepad1.right_bumper ? -1 : 0)));
-            drive.outtake.setVelocity(gamepad1.left_bumper || gamepad1.right_trigger > 0 ? outtakePowerPercent : 0);
+            drive.outtake.setVelocity(gamepad1.left_bumper || gamepad1.right_trigger > 0 ? outtakeTargetVelocity : 0);
 
             boolean dpadL = gamepad1.dpad_left;
             boolean dpadR = gamepad1.dpad_right;
 
             if(dpadL && !wasLeftDPadPressed) {
                 wasLeftDPadPressed = true;
-                outtakePowerPercent = Math.min(3500, outtakePowerPercent + 50);
+                outtakeTargetVelocity = Math.min(3500, outtakeTargetVelocity + 50);
             }
             if(dpadR && !wasRightDPadPressed) {
                 wasRightDPadPressed = true;
-                outtakePowerPercent = Math.max(0, outtakePowerPercent - 20);
+                outtakeTargetVelocity = Math.max(0, outtakeTargetVelocity - 20);
             }
 
             if(!dpadL) wasLeftDPadPressed = false;
@@ -160,9 +171,9 @@ public class Main extends LinearOpMode {
                 //outtakeTimer.reset();
                 //outtakeRunning = true;
 
-                currentAimMode = aimModeValues[(currentAimMode.ordinal() + 1) % aimModeValues.length];
-                drive.servoGate.setPosition(currentAimMode == AimMode.HIVE ? 300 : -300);
-                if(currentAimMode == AimMode.HIVE)
+                aimMode = aimModeValues[(aimMode.ordinal() + 1) % aimModeValues.length];
+                drive.servoGate.setPosition(aimMode == AimMode.HIVE ? 300 : -300);
+                if(aimMode == AimMode.HIVE)
                     hiveAimPid.reset();
             }
             prevA = aPressed;
@@ -172,8 +183,13 @@ public class Main extends LinearOpMode {
             //drive.outtake.setPower(outtakeRunning ? 1.0 : 0.0);
             //Backplate servo
             //Y / B set the target angle (degrees); it is converted to 0-1 and sent to the servo
-            if(gamepad1.y) backplateServoPosition = pollenAngle;
-            if(gamepad1.b) backplateServoPosition = nectarAngle;
+            if(gamepad1.y) intakeMode = IntakeMode.POLLEN;
+            if(gamepad1.b) intakeMode = IntakeMode.NECTAR;
+
+            switch(intakeMode) {
+                case POLLEN: backplateServoPosition = pollenAngle; break;
+                case NECTAR: backplateServoPosition = nectarAngle; break;
+            }
 
             //Incline servo
             //D-pad up/down: each new press (not hold, via prev flags) adds/subtracts INCLINE_STEP_DEGREES,
@@ -213,7 +229,7 @@ public class Main extends LinearOpMode {
                 double y_speed = -gamepad1.left_stick_y; //Forward/back input
                 double rot = -gamepad1.right_stick_x; //Rotation input
 
-                if(currentAimMode == AimMode.HIVE)
+                if(aimMode == AimMode.HIVE)
                     rot = HiveAimMode();
 
                 double curAngle = drive.GetYawRadians();
@@ -247,10 +263,10 @@ public class Main extends LinearOpMode {
                 //Update heading and x/y position, then show them on telemetry
                 drive.positionTracker.updateDirection();
                 drive.positionTracker.updatePosition();
-                telemetry.addData("Angle Degs", drive.positionTracker.getDirection());
-                String position = //Text shown on telemetry: robot x/y
-                "Pos: "+"("+drive.positionTracker.getX()+" , "+drive.positionTracker.getY()+")";
-                telemetry.addLine(position);
+                //telemetry.addData("Angle Degs", drive.positionTracker.getDirection());
+                //String position = //Text shown on telemetry: robot x/y
+                //"Pos: "+"("+drive.positionTracker.getX()+" , "+drive.positionTracker.getY()+")";
+                //telemetry.addLine(position);
 
                 //Estimate outtake encoder speed from the change in ticks since the last loop.
                 int outtakeTicks = drive.outtake.getCurrentPosition();
@@ -260,22 +276,23 @@ public class Main extends LinearOpMode {
             //endregion
             //Driver Station telemetry
             telemetry.addData("Wheel Motor Power",power);
-            telemetry.addData("Outtake Power Percent", outtakePowerPercent);
+            telemetry.addData("Outtake Power", outtakeTargetVelocity);
             //telemetry.addData("Outtake Power: ", drive.outtake.getPower());
             //telemetry.addData("Outtake ticks: ", outtakeTicks);
             //telemetry.addData("Prev outtake ticks: ", prevOuttakeTicks);
             //telemetry.addData("deltaTime ", time.getDeltaTime());
-            telemetry.addData("Outtake velocity", outtakeVelocity);
+            //telemetry.addData("Outtake velocity", outtakeVelocity);
             //telemetry.addData("Incline",drive.outtakeIncline.getPosition());
             //telemetry.addData("Backplate",drive.outtakeBackplate.getPosition()); //
             //This is the commanded angle relative to center, not measured servo feedback.
             telemetry.addData("Backplate commanded angle (degrees)",
                     inclineServoPosition);
             telemetry.addData("Flowers", flowersDown ? "Down" : "Up");
-            telemetry.addData("Aim Mode", currentAimMode);
-            telemetry.addData("Last Bearing", webCam.getBearing());
+            telemetry.addData("Aim Mode", aimMode);
+            //telemetry.addData("Last Bearing", webCam.getBearing());
             //telemetry.addData("Cam FPS", webCam.getFps());
-
+            if(drive.intake.getPower() > 0.1 || colorSensorUpdateTimer > 0.33) UpdateColorSensor();
+            colorSensor.UpdateTelemetry();
             UpdateWebcam();
             telemetry.update();
         }
@@ -285,9 +302,20 @@ public class Main extends LinearOpMode {
         }
     }
 
+    private void InitializeMechanisms() {
+        webCam.init(hardwareMap, telemetry);
+        colorSensor.init(hardwareMap, telemetry);
+    }
+
     private void UpdateWebcam() {
         webCam.update();
-        webCam.displayAllDetectionTelemetry();
+        webCam.displayAllDetectionTelemetry(alliance);
+    }
+    private void UpdateColorSensor() {
+        colorSensorUpdateTimer = 0;
+        int color = colorSensor.getDetectedColor().ordinal();
+        if(color == 0 || color == 1 || color == 3) intakeMode = IntakeMode.NECTAR;
+        else intakeMode = IntakeMode.POLLEN;
     }
 
     static double[] robotToFieldCentric (double vxRobot, double vyRobot, double cur_angle_degrees)
@@ -306,9 +334,11 @@ public class Main extends LinearOpMode {
         hiveAimPid.setTarget(0);
         double rotate = hiveAimPid.calculate(webCam.getBearing());
 
-        double powerSlope = (1790-1740)/(55.9-46.0);
+        double maxPower = (intakeMode == IntakeMode.NECTAR ? 1790 : 1590);
+        double minPower = (intakeMode == IntakeMode.NECTAR ? 1740 : 1540);
+        double powerSlope = (maxPower - minPower)/(55.9-46.0);
         double backplateSlope = (135)/(55.9-46.0);
-        outtakePowerPercent = 1790 + powerSlope * (webCam.getRange() - 46);
+        outtakeTargetVelocity = minPower + powerSlope * (webCam.getRange() - 46);
 
         double currentIncline = backplateSlope * (webCam.getRange() - 46);
         if(Math.abs(currentIncline - lastBackplateIncrement) > backplateIncrementDeadzone) {

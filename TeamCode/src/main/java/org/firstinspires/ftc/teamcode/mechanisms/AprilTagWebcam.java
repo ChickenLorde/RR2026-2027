@@ -12,6 +12,7 @@ import org.firstinspires.ftc.robotcore.external.hardware.camera.controls.GainCon
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.internal.camera.calibration.CameraCalibration;
+import org.firstinspires.ftc.teamcode.teleop.Main;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagClusterDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
@@ -86,7 +87,7 @@ public class AprilTagWebcam {
         return detectedTags;
     }
 
-    public void displayDetectionTelemetry(AprilTagDetection detected){
+    public void displayDetectionTelemetry(AprilTagDetection detected, char alliance){
         if(detected == null) {return;}
 
         AprilTagClusterDetection cluster = null;
@@ -95,7 +96,7 @@ public class AprilTagWebcam {
         {
             cluster = (AprilTagClusterDetection) detected;
             // Only tags whose configured name starts with R are used for Hive aiming.
-            if(cluster.metadata == null || cluster.metadata.name.charAt(0) != 'R') return;
+            if(cluster.metadata == null || cluster.metadata.name.charAt(0) != alliance) return;
             lastBearing = cluster.ftcPose.bearing;
             lastRange = cluster.ftcPose.range;
         }
@@ -103,7 +104,7 @@ public class AprilTagWebcam {
         {
             single = (AprilTagSingleDetection) detected;
             // Keep the same tag filter for individual detections and clusters.
-            if(single.metadata == null || single.metadata.name.charAt(0) != 'R') return;
+            if(single.metadata == null || single.metadata.name.charAt(0) != alliance) return;
             lastBearing = single.ftcPose.bearing;
             lastRange = single.ftcPose.range;
         }
@@ -122,9 +123,9 @@ public class AprilTagWebcam {
         }
     }
 
-    public void displayAllDetectionTelemetry() {
+    public void displayAllDetectionTelemetry(Main.Alliance alliance) {
         for(AprilTagDetection detected : detectedTags)
-            displayDetectionTelemetry(detected);
+            displayDetectionTelemetry(detected, alliance == Main.Alliance.RED ? 'R' : 'B');
     }
     public void stop() {
         if(visionPortal != null)

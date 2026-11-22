@@ -12,7 +12,7 @@ import org.firstinspires.ftc.teamcode.Utility.Time;
 import org.firstinspires.ftc.teamcode.Utility.Vector2;
 import org.firstinspires.ftc.teamcode.mechanisms.PositionTracker;
 
-import org.firstinspires.ftc.teamcode.subsystems.PID_Test;
+import org.firstinspires.ftc.teamcode.subsystems.PidControl;
 
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.Servo;
@@ -194,7 +194,7 @@ public class Driver {
     {
 
         double startDistance = getDistance();
-        PID_Test pid1 = new PID_Test(Kp, Ki, Kd);
+        PidControl pid1 = new PidControl(Kp, Ki, Kd);
 
         pid1.setTarget(ticks);
         double distance = Double.MAX_VALUE;
@@ -234,7 +234,7 @@ public class Driver {
     {
 
         double startDistance = getDistance();
-        PID_Test pid1 = new PID_Test(Kp, Ki, Kd);
+        PidControl pid1 = new PidControl(Kp, Ki, Kd);
 
         pid1.setTarget(ticks);
         double distance = Double.MAX_VALUE;

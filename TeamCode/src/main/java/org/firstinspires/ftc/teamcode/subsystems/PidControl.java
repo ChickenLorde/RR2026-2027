@@ -2,7 +2,7 @@ package org.firstinspires.ftc.teamcode.subsystems;
 
 import org.firstinspires.ftc.teamcode.Utility.Time;
 
-public class PID_Test {
+public class PidControl {
     private final double Kp, Ki, Kd; // PID gains
     private double target;
     private double integral;
@@ -15,7 +15,7 @@ public class PID_Test {
     private final Time time;
 
     // Constructor to initialize gains
-    public PID_Test(double Kp, double Ki, double Kd) {
+    public PidControl(double Kp, double Ki, double Kd) {
         this.Kp = Kp;
         this.Ki = Ki;
         this.Kd = Kd;
