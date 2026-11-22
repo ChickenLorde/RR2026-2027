@@ -323,6 +323,17 @@ public class Driver {
         telemetry.update();
     }
 
+    public double[] robotToFieldCentric(double vxRobot, double vyRobot, double cur_angle_degrees)
+    {
+        double cos = Math.cos(cur_angle_degrees);
+        double sin = Math.sin(cur_angle_degrees);
+
+        double vxField = vxRobot * cos + vyRobot * sin;
+        double vyField = -vxRobot * sin + vyRobot * cos;
+
+        return new double[] { vxField, vyField };
+    }
+
     public void resetPower()
     {
         frontLeftMotor.setPower(0);

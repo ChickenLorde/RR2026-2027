@@ -13,7 +13,7 @@ public class Time {
         previousTime = currentTime;
         timer += deltaTime;
     }
-    public double getTimer() {
+    public double getTime() {
         return timer;
     }
 
@@ -25,5 +25,7 @@ public class Time {
     public void resetTime()
     {
         timer = 0;
+        deltaTime = 0;
+        previousTime = (currentTime = System.nanoTime());
     }
 }

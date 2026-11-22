@@ -55,7 +55,7 @@ public class ColorSensor {
         return lastDetectedColor;
     }
 
-    public void UpdateTelemetry() {
+    public void updateTelemetry() {
         telemetry.addData("Detected Intake Color", lastDetectedColor.toString());
     }
 }
