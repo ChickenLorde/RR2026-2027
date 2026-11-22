@@ -28,7 +28,7 @@ public class DriveLeftAuto extends LinearOpMode
 
                 if(time.getTime() < startDelay) continue;
 
-                double x_speed = 1;
+                double x_speed = -1;
 
                 double curAngle = drive.GetYawRadians();
                 //drive.positionTracker.getDirection();
@@ -67,6 +67,30 @@ public class DriveLeftAuto extends LinearOpMode
         @Override
         public void runOpMode() throws InterruptedException {
             startDelay = 5;
+            super.runOpMode();
+        }
+    }
+    @Autonomous(name = "Drive Left Auto (10s Delay)")
+    public static class DriveLeftAuto10 extends DriveLeftAuto {
+        @Override
+        public void runOpMode() throws InterruptedException {
+            startDelay = 10;
+            super.runOpMode();
+        }
+    }
+    @Autonomous(name = "Drive Left Auto (15s Delay)")
+    public static class DriveLeftAuto15 extends DriveLeftAuto {
+        @Override
+        public void runOpMode() throws InterruptedException {
+            startDelay = 15;
+            super.runOpMode();
+        }
+    }
+    @Autonomous(name = "Drive Left Auto (20s Delay)")
+    public static class DriveLeftAuto20 extends DriveLeftAuto {
+        @Override
+        public void runOpMode() throws InterruptedException {
+            startDelay = 20;
             super.runOpMode();
         }
     }

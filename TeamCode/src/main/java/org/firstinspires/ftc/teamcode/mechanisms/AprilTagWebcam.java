@@ -87,6 +87,26 @@ public class AprilTagWebcam {
         return detectedTags;
     }
 
+    public AprilTagDetection getClosestTag() {
+        List<AprilTagDetection> detectedTags = getDetectedTags();
+        if(detectedTags.isEmpty()) return null;
+        if(detectedTags.size() == 1) return detectedTags.get(0);
+
+        AprilTagDetection closest = null;
+        double closestBearing = Double.MAX_VALUE;
+
+        for(AprilTagDetection detected : detectedTags) {
+            if(!(detected instanceof AprilTagClusterDetection)) continue;
+
+            double bearing = detected.ftcPose.bearing;
+            if(bearing < closestBearing) {
+                closest = detected;
+                closestBearing = bearing;
+            }
+        }
+        return closest;
+    }
+
     public void displayDetectionTelemetry(AprilTagDetection detected, char alliance){
         if(detected == null) {return;}
 
@@ -124,8 +144,7 @@ public class AprilTagWebcam {
     }
 
     public void displayAllDetectionTelemetry(Main.Alliance alliance) {
-        for(AprilTagDetection detected : detectedTags)
-            displayDetectionTelemetry(detected, alliance == Main.Alliance.RED ? 'R' : 'B');
+        displayDetectionTelemetry(getClosestTag(), alliance == Main.Alliance.RED ? 'R' : 'B');
     }
     public void stop() {
         if(visionPortal != null)

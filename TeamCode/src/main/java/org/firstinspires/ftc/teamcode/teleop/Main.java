@@ -12,7 +12,7 @@ import org.firstinspires.ftc.teamcode.mechanisms.ColorSensor;
 import org.firstinspires.ftc.teamcode.parts.Driver;
 import org.firstinspires.ftc.teamcode.subsystems.PidControl;
 
-@TeleOp(name = "Main TeleOp",group = "Competition Modes")
+@TeleOp(name = "Main TeleOp (RED)",group = "Competition Modes")
 public class Main extends LinearOpMode {
     //Busy-wait for the requested duration; currently unused.
     public void waitSeconds(double seconds) {
@@ -34,7 +34,7 @@ public class Main extends LinearOpMode {
     static final double nectarAngle = 300; //Backplate target when B is pressed (clamped to the servo range)
     static final double pollenAngle = -300; //Backplate target when Y is pressed (clamped to the servo range)
     static final double INCLINE_STEP_DEGREES = 15; //Incline change per D-pad up/down press
-    static final double FLOWER_DOWN_DEGREES = 90; //Flower target when lowered
+    static final double FLOWER_DOWN_DEGREES = 82; //Flower target when lowered
     static final double FLOWER_UP_DEGREES = 360; //Flower target when raised
     static final double OUTTAKE_RUN_SECONDS = 5.0; //Duration of each timed outtake run
     boolean prevDpadUp = false; //D-pad up state last loop, used to detect a new press
@@ -84,7 +84,7 @@ public class Main extends LinearOpMode {
 
     private AimMode[] aimModeValues = AimMode.values();
 
-    private Alliance alliance = Alliance.RED;
+    protected Alliance alliance = Alliance.RED;
 
     public AimMode aimMode = AimMode.MANUAL;
     public IntakeMode intakeMode = IntakeMode.POLLEN;
@@ -95,7 +95,9 @@ public class Main extends LinearOpMode {
     public ColorSensor colorSensor = new ColorSensor();
 
     private double colorSensorUpdateTimer;
-    private boolean displayDebug;
+    private boolean displayDebug = true;
+
+    private double absolutePowerPercent = 1;
 
     public void runOpMode() throws InterruptedException {
 
@@ -117,12 +119,14 @@ public class Main extends LinearOpMode {
         boolean prevA = false;
 
         while(!isStarted() && !isStopRequested()) {
+            /*telemetry.addData("Alliance",alliance.toString());
             boolean aPressed = gamepad1.a;
             if(aPressed && !prevA) {
                 if(alliance == Alliance.BLUE) alliance = Alliance.RED;
                 else alliance = Alliance.BLUE;
             }
             prevA = aPressed;
+            telemetry.update();*/
         }
         prevA = false;
 
@@ -134,7 +138,7 @@ public class Main extends LinearOpMode {
             colorSensorUpdateTimer += time.getDeltaTime();
             //Each bumper contributes positive power to the intake.
             drive.intake.setPower(((gamepad1.left_bumper && outtakeVelocity > 1200 || gamepad1.left_trigger > 0 ? 1.0 : 0) - (gamepad1.right_bumper ? 1 : 0)));
-            drive.outtake.setVelocity(gamepad1.left_bumper || gamepad1.right_trigger > 0 ? outtakeTargetVelocity : 0);
+            drive.outtake.setVelocity(gamepad1.left_bumper || gamepad1.right_trigger > 0 ? outtakeTargetVelocity * absolutePowerPercent : 0);
 
             if(gamepad1.leftStickButtonWasPressed()) {
                 displayDebug = !displayDebug;
@@ -145,11 +149,11 @@ public class Main extends LinearOpMode {
 
             if(dpadL && !wasLeftDPadPressed) {
                 wasLeftDPadPressed = true;
-                outtakeTargetVelocity = Math.min(3500, outtakeTargetVelocity + 50);
+                absolutePowerPercent = Math.min(3500, absolutePowerPercent - 0.1);
             }
             if(dpadR && !wasRightDPadPressed) {
                 wasRightDPadPressed = true;
-                outtakeTargetVelocity = Math.max(0, outtakeTargetVelocity - 50);
+                absolutePowerPercent = Math.max(0, absolutePowerPercent + 0.1);
             }
 
             if(!dpadL) wasLeftDPadPressed = false;
@@ -239,9 +243,11 @@ public class Main extends LinearOpMode {
             //endregion
 
             if(displayDebug) {
+                telemetry.addData("Alliance",alliance.toString());
                 //Driver Station telemetry
                 telemetry.addData("Wheel Motor Power", power);
                 telemetry.addData("Outtake Power", outtakeTargetVelocity);
+                telemetry.addData("Absolute Outtake Power Percent", absolutePowerPercent);
                 /*telemetry.addData("Outtake Power: ", drive.outtake.getPower());
                 //telemetry.addData("Outtake ticks: ", outtakeTicks);
                 //telemetry.addData("Prev outtake ticks: ", prevOuttakeTicks);
@@ -261,15 +267,20 @@ public class Main extends LinearOpMode {
                 colorSensor.updateTelemetry();
                 updateWebcam();
             } else {
+                telemetry.addData("Aim Mode", aimMode);
+                telemetry.addLine();
                 telemetry.addLine("Left Joystick: (Drive)");
                 telemetry.addLine("Right Joystick: (Turn)");
                 telemetry.addLine("A: (Toggle Aim Mode)");
                 telemetry.addLine("Y: (Intake Mode: Pollen)");
                 telemetry.addLine("B: (Intake Mode: Nectar)");
-                telemetry.addLine("Left Trigger: (Intake & Outtake)");
-                telemetry.addLine("Left Bumper: (Intake)");
+                telemetry.addLine("X: (Toggle Flower Ramp)");
+                telemetry.addLine("Left Bumper: (Intake & Outtake)");
+                telemetry.addLine("Left Trigger: (Intake)");
                 telemetry.addLine("Right Trigger: (Outtake)");
                 telemetry.addLine("Right Bumper: (Intake Reverse)");
+                telemetry.addLine("D-Pad Vertical: (Backplate Incline)");
+                telemetry.addLine("D-Pad Horizontal: (Manual Outtake Power)");
             }
             telemetry.update();
         }
@@ -301,13 +312,13 @@ public class Main extends LinearOpMode {
         hiveAimPid.setTarget(0);
         double rotate = hiveAimPid.calculate(webCam.getBearing());
 
-        double maxPower = (intakeMode == IntakeMode.NECTAR ? 1790 : 1590);
-        double minPower = (intakeMode == IntakeMode.NECTAR ? 1740 : 1540);
-        double powerSlope = (maxPower - minPower)/(55.9-46.0);
-        double backplateSlope = (135)/(55.9-46.0);
-        outtakeTargetVelocity = minPower + powerSlope * (webCam.getRange() - 46);
+        double maxPower = (intakeMode == IntakeMode.NECTAR ? 1800 : 1840);
+        double minPower = (intakeMode == IntakeMode.NECTAR ? 1790 : 1835);
+        double powerSlope = (maxPower - minPower)/(55-47.0);
+        double backplateSlope = (30)/(55-46.0);
+        outtakeTargetVelocity = minPower + powerSlope * (webCam.getRange() - 47);
 
-        double currentIncline = backplateSlope * (webCam.getRange() - 46);
+        double currentIncline = backplateSlope * (webCam.getRange() - 47);
         if(Math.abs(currentIncline - lastBackplateIncrement) > backplateIncrementDeadzone) {
             inclineServoPosition = (int)currentIncline;
             lastBackplateIncrement = (int)currentIncline;
@@ -317,4 +328,14 @@ public class Main extends LinearOpMode {
 
         return rotate * 0.45;
     }
+
+    @TeleOp(name="Main TeleOp (BLUE)")
+    public static class MainTeleOpBlue extends Main {
+        @Override
+        public void runOpMode() throws InterruptedException {
+            alliance = Alliance.BLUE;
+            super.runOpMode();
+        }
+    }
 }
+
